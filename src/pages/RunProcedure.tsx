@@ -81,7 +81,7 @@ export default function RunProcedure() {
             <div className="bg-card rounded-lg border overflow-hidden">
               {/* Image grande */}
               {step.image ? (
-                <div className="bg-slate-50 dark:bg-slate-900/40 border-b flex items-center justify-center">
+                <div className="bg-muted/40 border-b flex items-center justify-center">
                   <img
                     src={step.image}
                     alt={`Step ${current + 1}: ${step.title}`}
