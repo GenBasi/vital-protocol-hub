@@ -1,16 +1,14 @@
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { procedures } from "@/data/procedures";
 import {
   reagents,
   getReagentStatus,
   daysUntilExpiration,
 } from "@/data/reagents";
-import { StatusBadge } from "@/components/StatusBadge";
 import { ReagentStatusBadge } from "@/components/ReagentStatusBadge";
+import { listProcedures, type Procedure } from "@/lib/procedures-api";
 import {
   ArrowRight,
   BookOpen,
@@ -22,19 +20,22 @@ import {
 
 export default function Dashboard() {
   const [q, setQ] = useState("");
+  const [items, setItems] = useState<Procedure[]>([]);
   const ql = q.trim().toLowerCase();
 
+  useEffect(() => {
+    listProcedures().then(setItems).catch(() => setItems([]));
+  }, []);
+
   const matches = ql
-    ? procedures.filter((p) =>
-        `${p.title} ${p.machine} ${p.module} ${p.test} ${p.area}`
+    ? items.filter((p) =>
+        `${p.title} ${p.instrument ?? ""} ${p.module ?? ""} ${p.test ?? ""} ${p.area ?? ""}`
           .toLowerCase()
           .includes(ql),
       )
     : [];
 
-  const recent = [...procedures]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 5);
+  const recent = items.slice(0, 5);
 
   const attentionReagents = useMemo(
     () =>
@@ -48,7 +49,6 @@ export default function Dashboard() {
 
   return (
     <div className="p-5 md:p-8 max-w-[1100px] mx-auto space-y-6">
-      {/* Hero search */}
       <div className="space-y-3">
         <div>
           <h1 className="text-2xl font-semibold">Cosa devi fare oggi?</h1>
@@ -61,7 +61,7 @@ export default function Dashboard() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Cerca per test, modulo, macchina (es. FT4, E1, IRON2…)"
+            placeholder="Cerca per test, modulo, strumento (es. FT4, E1…)"
             className="pl-10 h-11 text-sm"
             autoFocus
           />
@@ -81,10 +81,9 @@ export default function Dashboard() {
                     <div className="min-w-0">
                       <div className="font-medium truncate">{p.title}</div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {p.module} · {p.test} · {p.machine}
+                        {[p.module, p.test, p.instrument].filter(Boolean).join(" · ")}
                       </div>
                     </div>
-                    <StatusBadge status={p.status} />
                   </Link>
                 ))
               )}
@@ -93,13 +92,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <QuickAction
           to="/procedures"
           icon={BookOpen}
           title="Libreria procedure"
-          subtitle={`${procedures.length} procedure disponibili`}
+          subtitle={`${items.length} procedure salvate`}
         />
         <QuickAction
           to="/reagents"
@@ -111,12 +109,11 @@ export default function Dashboard() {
           to="/procedures/new"
           icon={Plus}
           title="Nuova procedura"
-          subtitle="Crea da template o vuota"
+          subtitle="Crea in pochi step"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent procedures */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
@@ -131,35 +128,40 @@ export default function Dashboard() {
                 Tutte <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
-            <div className="divide-y">
-              {recent.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0 group"
-                >
-                  <Link
-                    to={`/procedures/${p.id}`}
-                    className="flex-1 min-w-0 group-hover:text-primary"
+            {recent.length === 0 ? (
+              <div className="text-xs text-muted-foreground py-3">
+                Nessuna procedura. <Link to="/procedures/new" className="text-primary hover:underline">Crea la prima</Link>.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {recent.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0 group"
                   >
-                    <div className="text-sm font-medium truncate leading-tight">{p.title}</div>
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {p.module} · {p.test}
-                    </div>
-                  </Link>
-                  <Link
-                    to={`/procedures/${p.id}/run`}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-primary"
-                    title="Esegui"
-                  >
-                    <Play className="h-3.5 w-3.5" />
-                  </Link>
-                </div>
-              ))}
-            </div>
+                    <Link
+                      to={`/procedures/${p.id}`}
+                      className="flex-1 min-w-0 group-hover:text-primary"
+                    >
+                      <div className="text-sm font-medium truncate leading-tight">{p.title}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {[p.module, p.test].filter(Boolean).join(" · ") || "—"}
+                      </div>
+                    </Link>
+                    <Link
+                      to={`/procedures/${p.id}/run`}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-primary"
+                      title="Esegui"
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Attention: reagents */}
         <Card className={attentionReagents.length > 0 ? "border-warning/30" : ""}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
