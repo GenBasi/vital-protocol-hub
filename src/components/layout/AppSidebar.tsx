@@ -1,5 +1,5 @@
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Wrench, Plus, FlaskConical } from "lucide-react";
+import { LayoutDashboard, BookOpen, Plus, FlaskConical, Package } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, end: true },
   { title: "Libreria procedure", url: "/procedures", icon: BookOpen, end: false },
-  { title: "Troubleshooting", url: "/troubleshooting", icon: Wrench, end: false },
+  { title: "Scorte reattivi", url: "/reagents", icon: Package, end: false },
 ];
 
 const quickItems = [
