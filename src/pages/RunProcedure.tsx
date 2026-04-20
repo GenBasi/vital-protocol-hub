@@ -1,30 +1,62 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getProcedure } from "@/data/procedures";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
-  AlertCircle,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Eye,
   Target,
   X,
 } from "lucide-react";
+import { getProcedureWithSteps, type ProcedureWithSteps } from "@/lib/procedures-api";
+import { toast } from "@/hooks/use-toast";
 
 export default function RunProcedure() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const procedure = getProcedure(id);
+  const [procedure, setProcedure] = useState<ProcedureWithSteps | null>(null);
+  const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
   const [done, setDone] = useState<Record<string, boolean>>({});
   const [finished, setFinished] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const proc = await getProcedureWithSteps(id);
+        if (!cancelled) setProcedure(proc);
+      } catch (e) {
+        toast({ title: "Errore caricamento", description: String(e), variant: "destructive" });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading) {
+    return <div className="p-8 text-sm text-muted-foreground">Caricamento…</div>;
+  }
+
   if (!procedure) {
     return <div className="p-8 text-sm text-muted-foreground">Procedura non trovata.</div>;
+  }
+
+  if (procedure.steps.length === 0) {
+    return (
+      <div className="p-8 space-y-3">
+        <p className="text-sm text-muted-foreground">Questa procedura non ha step.</p>
+        <Button asChild variant="outline" size="sm">
+          <Link to={`/procedures/${procedure.id}/edit`}>Aggiungi step</Link>
+        </Button>
+      </div>
+    );
   }
 
   const total = procedure.steps.length;
@@ -50,17 +82,20 @@ export default function RunProcedure() {
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-muted/40 flex flex-col">
-      {/* Top bar fissa, contesto sempre visibile */}
       <div className="bg-card border-b sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-5 py-2.5 flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <Badge variant="outline" className="text-[10px] font-mono py-0">
-                {procedure.module}
-              </Badge>
-              <Badge variant="outline" className="text-[10px] font-mono py-0">
-                {procedure.test}
-              </Badge>
+              {procedure.module && (
+                <Badge variant="outline" className="text-[10px] font-mono py-0">
+                  {procedure.module}
+                </Badge>
+              )}
+              {procedure.test && (
+                <Badge variant="outline" className="text-[10px] font-mono py-0">
+                  {procedure.test}
+                </Badge>
+              )}
               <span className="truncate">{procedure.title}</span>
             </div>
           </div>
@@ -77,13 +112,11 @@ export default function RunProcedure() {
       <div className="flex-1 max-w-5xl mx-auto w-full p-5 md:p-6">
         {!finished ? (
           <div className="space-y-4">
-            {/* Step hero */}
             <div className="bg-card rounded-lg border overflow-hidden">
-              {/* Image grande */}
-              {step.image ? (
+              {step.image_url ? (
                 <div className="bg-muted/40 border-b flex items-center justify-center">
                   <img
-                    src={step.image}
+                    src={step.image_url}
                     alt={`Step ${current + 1}: ${step.title}`}
                     className="w-full max-h-[440px] object-contain"
                   />
@@ -101,28 +134,10 @@ export default function RunProcedure() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h1 className="text-xl font-semibold leading-tight">{step.title}</h1>
-                    <p className="text-sm mt-1.5 leading-relaxed">{step.description}</p>
+                    {step.description && (
+                      <p className="text-sm mt-1.5 leading-relaxed">{step.description}</p>
+                    )}
                   </div>
-                </div>
-
-                {/* Verifica + se non funziona */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-4">
-                  {step.check && (
-                    <div className="rounded-md border-2 border-primary/30 bg-primary-soft/60 p-3">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-primary inline-flex items-center gap-1">
-                        <Eye className="h-3 w-3" /> Cosa verificare
-                      </div>
-                      <div className="text-sm mt-1 font-medium">{step.check}</div>
-                    </div>
-                  )}
-                  {step.ifFails && (
-                    <div className="rounded-md border border-warning/40 bg-warning-soft/60 p-3">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-warning inline-flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" /> Se non funziona
-                      </div>
-                      <div className="text-sm mt-1">{step.ifFails}</div>
-                    </div>
-                  )}
                 </div>
 
                 <label className="flex items-center gap-2 text-sm cursor-pointer select-none mt-4 pt-3 border-t">
@@ -135,7 +150,6 @@ export default function RunProcedure() {
               </div>
             </div>
 
-            {/* Mini checklist orizzontale */}
             <div className="flex flex-wrap gap-1.5">
               {procedure.steps.map((s, i) => (
                 <button
@@ -156,7 +170,6 @@ export default function RunProcedure() {
             </div>
           </div>
         ) : (
-          /* Schermata finale: esito atteso BEN visibile */
           <div className="bg-card rounded-lg border-2 border-success overflow-hidden">
             <div className="bg-success-soft p-6 text-center">
               <div className="h-14 w-14 mx-auto rounded-full bg-success text-success-foreground flex items-center justify-center">
@@ -172,7 +185,9 @@ export default function RunProcedure() {
                 <div className="text-[11px] font-bold uppercase tracking-wider text-success inline-flex items-center gap-1">
                   <Target className="h-3 w-3" /> Esito atteso
                 </div>
-                <div className="text-base font-medium mt-1.5">{procedure.expectedResult}</div>
+                <div className="text-base font-medium mt-1.5">
+                  {procedure.expected_result || "—"}
+                </div>
               </div>
               <div className="flex justify-center gap-2 mt-4">
                 <Button variant="outline" asChild>
@@ -187,7 +202,6 @@ export default function RunProcedure() {
         )}
       </div>
 
-      {/* Bottom nav fissa: avanti/indietro grandi */}
       {!finished && (
         <div className="bg-card border-t sticky bottom-0">
           <div className="max-w-5xl mx-auto px-5 py-3 flex items-center justify-between gap-3">
