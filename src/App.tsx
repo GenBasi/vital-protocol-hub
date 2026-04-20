@@ -8,8 +8,8 @@ import Dashboard from "./pages/Dashboard";
 import Library from "./pages/Library";
 import ProcedureDetail from "./pages/ProcedureDetail";
 import RunProcedure from "./pages/RunProcedure";
-import Troubleshooting from "./pages/Troubleshooting";
 import ProcedureEditor from "./pages/ProcedureEditor";
+import Reagents from "./pages/Reagents";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,7 +28,7 @@ const App = () => (
             <Route path="/procedures/:id" element={<ProcedureDetail />} />
             <Route path="/procedures/:id/edit" element={<ProcedureEditor />} />
             <Route path="/procedures/:id/run" element={<RunProcedure />} />
-            <Route path="/troubleshooting" element={<Troubleshooting />} />
+            <Route path="/reagents" element={<Reagents />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

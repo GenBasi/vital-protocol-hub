@@ -1,12 +1,24 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { procedures } from "@/data/procedures";
-import { troubleshootingCases } from "@/data/troubleshooting";
+import {
+  reagents,
+  getReagentStatus,
+  daysUntilExpiration,
+} from "@/data/reagents";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ArrowRight, Eye, Play, Plus, Search, Wrench, AlertTriangle } from "lucide-react";
+import { ReagentStatusBadge } from "@/components/ReagentStatusBadge";
+import {
+  ArrowRight,
+  BookOpen,
+  Package,
+  Plus,
+  Search,
+  Play,
+} from "lucide-react";
 
 export default function Dashboard() {
   const [q, setQ] = useState("");
@@ -20,230 +32,212 @@ export default function Dashboard() {
       )
     : [];
 
-  const mostViewed = [...procedures].sort((a, b) => b.views - a.views).slice(0, 5);
   const recent = [...procedures]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 5);
-  const critical = procedures.filter(
-    (p) => p.status === "da-revisionare" || p.status === "bozza",
+
+  const attentionReagents = useMemo(
+    () =>
+      reagents
+        .map((r) => ({ ...r, status: getReagentStatus(r), daysToExp: daysUntilExpiration(r) }))
+        .filter((r) => r.status !== "ok")
+        .sort((a, b) => a.daysToExp - b.daysToExp)
+        .slice(0, 5),
+    [],
   );
 
   return (
-    <div className="p-5 md:p-6 space-y-5 max-w-[1400px]">
-      {/* Operational hero: search + quick actions */}
-      <Card className="border-primary/20 bg-gradient-to-br from-primary-soft/60 via-card to-card">
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold text-primary uppercase tracking-wider">
-                Strumento operativo
-              </div>
-              <h1 className="text-2xl font-semibold mt-0.5">
-                Cosa devi fare oggi?
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Cerca una procedura per test, modulo o macchina.
-              </p>
-              <div className="relative mt-3 max-w-2xl">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Es. FT4, calibrazione E1, IRON2…"
-                  className="pl-9 h-10 bg-card"
-                  autoFocus
-                />
-                {ql && (
-                  <div className="absolute z-20 top-11 left-0 right-0 bg-popover border rounded-md shadow-lg max-h-80 overflow-auto">
-                    {matches.length === 0 ? (
-                      <div className="p-3 text-sm text-muted-foreground">
-                        Nessuna procedura trovata.
+    <div className="p-5 md:p-8 max-w-[1100px] mx-auto space-y-6">
+      {/* Hero search */}
+      <div className="space-y-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Cosa devi fare oggi?</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Cerca una procedura o accedi alle aree principali.
+          </p>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Cerca per test, modulo, macchina (es. FT4, E1, IRON2…)"
+            className="pl-10 h-11 text-sm"
+            autoFocus
+          />
+          {ql && (
+            <div className="absolute z-20 top-12 left-0 right-0 bg-popover border rounded-md shadow-lg max-h-80 overflow-auto">
+              {matches.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground">
+                  Nessuna procedura trovata.
+                </div>
+              ) : (
+                matches.slice(0, 8).map((p) => (
+                  <Link
+                    key={p.id}
+                    to={`/procedures/${p.id}`}
+                    className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{p.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {p.module} · {p.test} · {p.machine}
                       </div>
-                    ) : (
-                      matches.slice(0, 8).map((p) => (
-                        <Link
-                          key={p.id}
-                          to={`/procedures/${p.id}`}
-                          className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{p.title}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {p.module} · {p.test} · {p.machine}
-                            </div>
-                          </div>
-                          <StatusBadge status={p.status} />
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 shrink-0">
-              <Button asChild size="sm">
-                <Link to="/procedures"><ArrowRight className="h-4 w-4" /> Tutte le procedure</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link to="/troubleshooting"><Wrench className="h-4 w-4" /> Troubleshooting</Link>
-              </Button>
-              <Button asChild size="sm" variant="ghost">
-                <Link to="/procedures/new"><Plus className="h-4 w-4" /> Nuova procedura</Link>
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Section
-          title="Procedure recenti"
-          subtitle="Ultime modificate"
-          to="/procedures"
-        >
-          {recent.map((p) => (
-            <ProcedureRow key={p.id} p={p} meta={p.updatedAt} />
-          ))}
-        </Section>
-
-        <Section
-          title="Più consultate"
-          subtitle="Le più usate dal team"
-          to="/procedures"
-        >
-          {mostViewed.map((p) => (
-            <ProcedureRow
-              key={p.id}
-              p={p}
-              meta={
-                <span className="inline-flex items-center gap-1">
-                  <Eye className="h-3 w-3" /> {p.views}
-                </span>
-              }
-            />
-          ))}
-        </Section>
-
-        <Section
-          title="Critiche"
-          subtitle={`${critical.length} da revisionare o in bozza`}
-          to="/procedures?status=da-revisionare"
-          tone="warning"
-        >
-          {critical.length === 0 && (
-            <div className="text-xs text-muted-foreground py-2">
-              Nessuna procedura critica.
+                    </div>
+                    <StatusBadge status={p.status} />
+                  </Link>
+                ))
+              )}
             </div>
           )}
-          {critical.slice(0, 5).map((p) => (
-            <ProcedureRow key={p.id} p={p} showStatus />
-          ))}
-        </Section>
+        </div>
       </div>
 
-      {/* Troubleshooting rapido */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning" />
-              <h2 className="text-sm font-semibold">Troubleshooting rapido</h2>
-            </div>
-            <Link
-              to="/troubleshooting"
-              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-            >
-              Tutti i casi <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {troubleshootingCases.slice(0, 6).map((c) => (
+      {/* Quick actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <QuickAction
+          to="/procedures"
+          icon={BookOpen}
+          title="Libreria procedure"
+          subtitle={`${procedures.length} procedure disponibili`}
+        />
+        <QuickAction
+          to="/reagents"
+          icon={Package}
+          title="Scorte reattivi"
+          subtitle={`${reagents.length} reattivi monitorati`}
+        />
+        <QuickAction
+          to="/procedures/new"
+          icon={Plus}
+          title="Nuova procedura"
+          subtitle="Crea da template o vuota"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Recent procedures */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold">Procedure recenti</h2>
+                <p className="text-[11px] text-muted-foreground">Ultime modificate</p>
+              </div>
               <Link
-                key={c.id}
-                to={`/troubleshooting?q=${encodeURIComponent(c.symptom.slice(0, 20))}`}
-                className="flex items-start gap-2 rounded-md border p-2.5 text-sm hover:border-primary/40 hover:bg-muted/40 transition-colors"
+                to="/procedures"
+                className="text-xs text-primary hover:underline inline-flex items-center gap-1"
               >
-                <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <div className="font-medium leading-tight truncate">{c.symptom}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    {c.area}
-                    {c.module && ` · ${c.module}`}
-                  </div>
-                </div>
+                Tutte <ArrowRight className="h-3 w-3" />
               </Link>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+            <div className="divide-y">
+              {recent.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0 group"
+                >
+                  <Link
+                    to={`/procedures/${p.id}`}
+                    className="flex-1 min-w-0 group-hover:text-primary"
+                  >
+                    <div className="text-sm font-medium truncate leading-tight">{p.title}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {p.module} · {p.test}
+                    </div>
+                  </Link>
+                  <Link
+                    to={`/procedures/${p.id}/run`}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-primary"
+                    title="Esegui"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Attention: reagents */}
+        <Card className={attentionReagents.length > 0 ? "border-warning/30" : ""}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold">Da controllare</h2>
+                <p className="text-[11px] text-muted-foreground">
+                  Reattivi in scadenza o sotto soglia
+                </p>
+              </div>
+              <Link
+                to="/reagents"
+                className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+              >
+                Inventario <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            {attentionReagents.length === 0 ? (
+              <div className="text-xs text-muted-foreground py-3">
+                Tutti i reattivi sono OK.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {attentionReagents.map((r) => (
+                  <Link
+                    key={r.id}
+                    to="/reagents"
+                    className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0 hover:text-primary"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base">{r.icon}</span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate leading-tight">
+                          {r.name}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          Lotto {r.lotNumber} ·{" "}
+                          {r.daysToExp < 0
+                            ? `scaduto da ${Math.abs(r.daysToExp)}g`
+                            : `scade tra ${r.daysToExp}g`}
+                        </div>
+                      </div>
+                    </div>
+                    <ReagentStatusBadge status={r.status} showIcon={false} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function Section({
+function QuickAction({
+  to,
+  icon: Icon,
   title,
   subtitle,
-  to,
-  tone,
-  children,
 }: {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
   title: string;
   subtitle: string;
-  to: string;
-  tone?: "warning";
-  children: React.ReactNode;
 }) {
   return (
-    <Card className={tone === "warning" ? "border-warning/30" : ""}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h2 className="text-sm font-semibold">{title}</h2>
-            <p className="text-[11px] text-muted-foreground">{subtitle}</p>
-          </div>
-          <Link to={to} className="text-xs text-primary hover:underline">
-            Vedi
-          </Link>
-        </div>
-        <div className="divide-y">{children}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ProcedureRow({
-  p,
-  meta,
-  showStatus,
-}: {
-  p: (typeof procedures)[number];
-  meta?: React.ReactNode;
-  showStatus?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0 group">
-      <Link
-        to={`/procedures/${p.id}`}
-        className="flex-1 min-w-0 group-hover:text-primary"
-      >
-        <div className="text-sm font-medium truncate leading-tight">{p.title}</div>
-        <div className="text-[11px] text-muted-foreground truncate">
-          {p.module} · {p.test}
-        </div>
-      </Link>
-      <div className="flex items-center gap-2 shrink-0">
-        {showStatus && <StatusBadge status={p.status} />}
-        {meta && (
-          <span className="text-[11px] text-muted-foreground">{meta}</span>
-        )}
-        <Link
-          to={`/procedures/${p.id}/run`}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-primary"
-          title="Esegui"
-        >
-          <Play className="h-3.5 w-3.5" />
-        </Link>
+    <Link
+      to={to}
+      className="group flex items-center gap-3 rounded-lg border bg-card p-4 hover:border-primary/40 hover:bg-primary-soft/30 transition-colors"
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-soft text-primary">
+        <Icon className="h-5 w-5" />
       </div>
-    </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold leading-tight">{title}</div>
+        <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{subtitle}</div>
+      </div>
+      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+    </Link>
   );
 }
