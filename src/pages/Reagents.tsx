@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +71,8 @@ export default function Reagents() {
   const [statusFilter, setStatusFilter] = useState<"all" | ReagentStatus>("all");
   const [sortBy, setSortBy] = useState<"name" | "expiration" | "quantity">("expiration");
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Reagent | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -109,6 +112,34 @@ export default function Reagents() {
     return c;
   }, [enriched]);
 
+  const allVisibleSelected =
+    filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleAll = () => {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((r) => next.delete(r.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((r) => next.add(r.id));
+        return next;
+      });
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
   const openNew = () => {
     setEditing(emptyReagent());
     setDialogOpen(true);
@@ -138,6 +169,8 @@ export default function Reagents() {
   };
 
   const exportPdf = () => {
+    const selectedFiltered = filtered.filter((r) => selectedIds.has(r.id));
+    const rows = selectedFiltered.length > 0 ? selectedFiltered : filtered;
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text("LabFlow — Inventario Reattivi", 14, 16);
@@ -146,8 +179,8 @@ export default function Reagents() {
     autoTable(doc, {
       startY: 28,
       head: [["Reattivo", "Modulo", "Lotto", "Scadenza", "Q.tà", "Min", "Stato"]],
-      body: filtered.map((r) => [
-        `${r.icon}  ${r.name}`,
+      body: rows.map((r) => [
+        stripEmoji(r.name),
         r.module ?? "—",
         r.lotNumber,
         new Date(r.expirationDate).toLocaleDateString("it-IT"),
@@ -174,7 +207,12 @@ export default function Reagents() {
             Monitora giacenze, lotti e scadenze dei reattivi del laboratorio.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {someSelected && (
+            <span className="text-xs font-medium text-primary bg-primary/10 rounded-full px-2.5 py-0.5 border border-primary/20">
+              {selectedIds.size} selezionat{selectedIds.size === 1 ? "o" : "i"}
+            </span>
+          )}
           <Button variant="outline" size="sm" onClick={exportPdf}>
             <Download className="h-4 w-4" /> Esporta PDF
           </Button>
@@ -244,6 +282,13 @@ export default function Reagents() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40">
+                <TableHead className="w-10 pl-4">
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    onCheckedChange={toggleAll}
+                    aria-label="Seleziona tutti"
+                  />
+                </TableHead>
                 <TableHead className="w-10"></TableHead>
                 <TableHead>Reattivo</TableHead>
                 <TableHead className="hidden md:table-cell">Modulo</TableHead>
@@ -258,6 +303,13 @@ export default function Reagents() {
             <TableBody>
               {filtered.map((r) => (
                 <TableRow key={r.id} className="text-sm">
+                  <TableCell className="pl-4 py-2">
+                    <Checkbox
+                      checked={selectedIds.has(r.id)}
+                      onCheckedChange={() => toggleOne(r.id)}
+                      aria-label={`Seleziona ${r.name}`}
+                    />
+                  </TableCell>
                   <TableCell className="text-xl py-2">{r.icon}</TableCell>
                   <TableCell className="font-medium py-2">{r.name}</TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground py-2">
@@ -317,7 +369,7 @@ export default function Reagents() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                     Nessun reattivo trovato.
                   </TableCell>
                 </TableRow>
@@ -501,6 +553,13 @@ function KpiPill({
       <div className="text-xl font-semibold leading-tight">{value}</div>
     </div>
   );
+}
+
+function stripEmoji(text: string) {
+  return text
+    .replace(/\p{Emoji_Presentation}/gu, "")
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .trim();
 }
 
 function statusLabel(s: ReagentStatus) {
