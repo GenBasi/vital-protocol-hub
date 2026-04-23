@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { listReagents, createReagent, updateReagent, deleteReagent } from "@/lib/reagents-api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +40,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  reagents as initialReagents,
   getReagentStatus,
   daysUntilExpiration,
   type Reagent,
@@ -53,7 +54,7 @@ import autoTable from "jspdf-autotable";
 const ICONS = ["🧪", "🩸", "🧫", "🧬", "💧", "⚗️", "🔬"];
 
 const emptyReagent = (): Reagent => ({
-  id: `r-${Date.now()}`,
+  id: "",
   name: "",
   icon: "🧪",
   module: "",
@@ -66,7 +67,41 @@ const emptyReagent = (): Reagent => ({
 });
 
 export default function Reagents() {
-  const [items, setItems] = useState<Reagent[]>(initialReagents);
+  const queryClient = useQueryClient();
+  const { data: items = [] } = useQuery({ queryKey: ["reagents"], queryFn: listReagents });
+
+  const createMutation = useMutation({
+    mutationFn: (r: Omit<Reagent, "id">) => createReagent(r),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reagents"] });
+      toast.success("Reattivo salvato");
+      setDialogOpen(false);
+      setEditing(null);
+    },
+    onError: () => toast.error("Errore nel salvataggio"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, r }: { id: string; r: Omit<Reagent, "id"> }) => updateReagent(id, r),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reagents"] });
+      toast.success("Reattivo salvato");
+      setDialogOpen(false);
+      setEditing(null);
+    },
+    onError: () => toast.error("Errore nel salvataggio"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteReagent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reagents"] });
+      toast.success("Reattivo eliminato");
+      setDeleteId(null);
+    },
+    onError: () => toast.error("Errore nell'eliminazione"),
+  });
+
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ReagentStatus>("all");
   const [sortBy, setSortBy] = useState<"name" | "expiration" | "quantity">("expiration");
@@ -154,18 +189,15 @@ export default function Reagents() {
       toast.error("Nome e numero di lotto sono obbligatori");
       return;
     }
-    setItems((prev) => {
-      const exists = prev.some((p) => p.id === editing.id);
-      return exists ? prev.map((p) => (p.id === editing.id ? editing : p)) : [editing, ...prev];
-    });
-    toast.success("Reattivo salvato");
-    setDialogOpen(false);
-    setEditing(null);
+    const { id, ...rest } = editing;
+    if (id === "") {
+      createMutation.mutate(rest);
+    } else {
+      updateMutation.mutate({ id, r: rest });
+    }
   };
   const remove = (id: string) => {
-    setItems((prev) => prev.filter((p) => p.id !== id));
-    toast.success("Reattivo eliminato");
-    setDeleteId(null);
+    deleteMutation.mutate(id);
   };
 
   const exportPdf = () => {
@@ -384,7 +416,7 @@ export default function Reagents() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editing && items.some((i) => i.id === editing.id) ? "Modifica reattivo" : "Nuovo reattivo"}
+              {editing && editing.id !== "" ? "Modifica reattivo" : "Nuovo reattivo"}
             </DialogTitle>
           </DialogHeader>
           {editing && (

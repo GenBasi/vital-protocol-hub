@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      reagents: {
+        Row: {
+          created_at: string
+          expiration_date: string
+          expiration_warning_days: number
+          icon: string
+          id: string
+          lot_number: string
+          min_stock: number
+          module: string | null
+          name: string
+          quantity: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expiration_date: string
+          expiration_warning_days?: number
+          icon?: string
+          id?: string
+          lot_number: string
+          min_stock?: number
+          module?: string | null
+          name: string
+          quantity?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expiration_date?: string
+          expiration_warning_days?: number
+          icon?: string
+          id?: string
+          lot_number?: string
+          min_stock?: number
+          module?: string | null
+          name?: string
+          quantity?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       procedure_steps: {
         Row: {
           created_at: string
