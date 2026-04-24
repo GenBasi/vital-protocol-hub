@@ -11,7 +11,8 @@ import RunProcedure from "./pages/RunProcedure";
 import ProcedureEditor from "./pages/ProcedureEditor";
 import Reagents from "./pages/Reagents";
 import NotFound from "./pages/NotFound";
-
+import GeneraQRCode from "./pages/GeneraQRCode";
+import ScannerizzaQRCode from "./pages/ScannerizzaQRCode";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -29,6 +30,8 @@ const App = () => (
             <Route path="/procedures/:id/edit" element={<ProcedureEditor />} />
             <Route path="/procedures/:id/run" element={<RunProcedure />} />
             <Route path="/reagents" element={<Reagents />} />
+            <Route path="/qrcode/genera" element={<GeneraQRCode />} />
+<Route path="/qrcode/scannerizza" element={<ScannerizzaQRCode />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
@@ -39,3 +42,4 @@ const App = () => (
 );
 
 export default App;
+
