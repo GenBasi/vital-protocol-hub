@@ -46,7 +46,8 @@ import {
   type ReagentStatus,
 } from "@/data/reagents";
 import { ReagentStatusBadge } from "@/components/ReagentStatusBadge";
-import { Download, Pencil, Plus, Search, Trash2, FlaskConical } from "lucide-react";
+import { Download, Pencil, Plus, Search, Trash2, FlaskConical, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -111,6 +112,8 @@ export default function Reagents() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Reagent | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [selectedQr, setSelectedQr] = useState<Set<string>>(new Set());
 
   const enriched = useMemo(
     () =>
@@ -245,6 +248,9 @@ export default function Reagents() {
               {selectedIds.size} selezionat{selectedIds.size === 1 ? "o" : "i"}
             </span>
           )}
+          <Button variant="outline" size="sm" onClick={() => setQrDialogOpen(true)}>
+            <QrCode className="h-4 w-4" /> Genera QR Code
+          </Button>
           <Button variant="outline" size="sm" onClick={exportPdf}>
             <Download className="h-4 w-4" /> Esporta PDF
           </Button>
@@ -536,6 +542,58 @@ export default function Reagents() {
               Annulla
             </Button>
             <Button onClick={save}>Salva</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Code Dialog */}
+      <Dialog open={qrDialogOpen} onOpenChange={(open) => { setQrDialogOpen(open); if (!open) setSelectedQr(new Set()); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Seleziona reattivi da stampare</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-between items-center py-2 border-b">
+            <span className="text-sm text-muted-foreground">{selectedQr.size} selezionati</span>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedQr(new Set(filtered.map(r => r.id)))}>
+                Seleziona tutti
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedQr(new Set())}>
+                Deseleziona tutti
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 py-2">
+            {filtered.map((r) => (
+              <div
+                key={r.id}
+                className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${selectedQr.has(r.id) ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+                onClick={() => setSelectedQr(prev => { const next = new Set(prev); next.has(r.id) ? next.delete(r.id) : next.add(r.id); return next; })}
+              >
+                <input type="checkbox" readOnly checked={selectedQr.has(r.id)} className="h-4 w-4 accent-primary" />
+                <span className="text-lg">{r.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{r.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">Lotto: {r.lotNumber} · Scad: {new Date(r.expirationDate).toLocaleDateString("it-IT")} · {r.quantity} {r.unit}</p>
+                </div>
+                <ReagentStatusBadge status={r.status} />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQrDialogOpen(false)}>Annulla</Button>
+            <Button
+              disabled={selectedQr.size === 0}
+              onClick={() => {
+                const printWindow = window.open("", "_blank");
+                if (!printWindow) return;
+                const selected = filtered.filter(r => selectedQr.has(r.id));
+                printWindow.document.write(`<html><head><title>Etichette QR</title><style>body{font-family:sans-serif;margin:0;padding:16px} .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px} .label{border:1px solid #ccc;border-radius:8px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center} .name{font-size:13px;font-weight:600} .info{font-size:11px;color:#666} @media print{@page{size:A4}}</style></head><body><div class="grid">${selected.map(r => `<div class="label"><img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(JSON.stringify({id:r.id,nome:r.name,lotto:r.lotNumber,scadenza:r.expirationDate,giacenza:r.quantity+' '+r.unit}))}" width="120" height="120"/><div class="name">${r.icon} ${r.name}</div><div class="info">Lotto: ${r.lotNumber}</div><div class="info">Scad: ${new Date(r.expirationDate).toLocaleDateString("it-IT")}</div><div class="info">Giacenza: ${r.quantity} ${r.unit}</div></div>`).join("")}</div><script>window.onload=()=>window.print()</script></body></html>`);
+                printWindow.document.close();
+              }}
+            >
+              🖨️ Stampa {selectedQr.size > 0 ? `(${selectedQr.size})` : ""} etichette
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
