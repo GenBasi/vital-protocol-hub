@@ -78,4 +78,20 @@ export async function updateReagent(id: string, r: Omit<Reagent, "id">): Promise
 export async function deleteReagent(id: string): Promise<void> {
   const { error } = await supabase.from("reagents").delete().eq("id", id);
   if (error) throw error;
+}export async function decrementReagent(id: string) {
+  const { data: current, error: fetchError } = await supabase
+    .from("reagents")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw fetchError;
+  if (current.quantity <= 0) throw new Error("Giacenza già a zero");
+  const { data, error } = await supabase
+    .from("reagents")
+    .update({ quantity: current.quantity - 1, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(data);
 }
