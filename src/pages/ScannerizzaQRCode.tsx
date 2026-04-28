@@ -4,8 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { decrementReagent } from "@/lib/reagents-api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getReagentStatus } from "@/data/reagents";
-import { ReagentStatusBadge } from "@/components/ReagentStatusBadge";
 
 export default function ScannerizzaQRCode() {
   const [scanning, setScanning] = useState(true);
@@ -13,18 +11,35 @@ export default function ScannerizzaQRCode() {
   const [reattivo, setReattivo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const processedRef = useRef(false);
 
   useEffect(() => {
     if (!scanning) return;
-    const scanner = new Html5Qrcode("qr-reader");
-    scannerRef.current = scanner;
+    processedRef.current = false;
+
+    let scanner: Html5Qrcode;
+    try {
+      scanner = new Html5Qrcode("qr-reader");
+      scannerRef.current = scanner;
+    } catch {
+      setErrore("Errore inizializzazione scanner.");
+      return;
+    }
+
     scanner
       .start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText) => {
-          await scanner.stop();
+          if (processedRef.current) return;
+          processedRef.current = true;
+
+          try {
+            scanner.stop().catch(() => {});
+          } catch {}
+
           setScanning(false);
+
           try {
             const parsed = JSON.parse(decodedText);
             const id = parsed.id;
@@ -36,14 +51,19 @@ export default function ScannerizzaQRCode() {
               .single();
             if (error || !data) throw new Error("Reattivo non trovato");
             setReattivo(data);
-          } catch {
-            setErrore("QR non riconosciuto o reattivo non trovato.");
+          } catch (e: any) {
+            setErrore(e.message ?? "QR non riconosciuto.");
           }
         },
         () => {}
       )
-      .catch(() => setErrore("Impossibile accedere alla fotocamera."));
-    return () => { scanner.stop().catch(() => {}); };
+      .catch(() => setErrore("Impossibile accedere alla fotocamera. Controlla i permessi."));
+
+    return () => {
+      try {
+        scanner?.stop().catch(() => {});
+      } catch {}
+    };
   }, [scanning]);
 
   const handleUsa = async () => {
@@ -67,14 +87,16 @@ export default function ScannerizzaQRCode() {
       {scanning && (
         <>
           <p className="text-sm text-muted-foreground">Inquadra il QR code del reattivo</p>
-          <div id="qr-reader" style={{ width: 300 }} />
+          <div id="qr-reader" style={{ width: "100%", maxWidth: 300 }} />
         </>
       )}
 
       {errore && (
         <div className="text-center space-y-4">
           <p className="text-red-500">{errore}</p>
-          <Button onClick={() => { setErrore(null); setScanning(true); }}>Riprova</Button>
+          <Button onClick={() => { setErrore(null); setReattivo(null); setScanning(true); }}>
+            Riprova
+          </Button>
         </div>
       )}
 
@@ -84,17 +106,24 @@ export default function ScannerizzaQRCode() {
             <span className="text-3xl">{reattivo.icon}</span>
             <div>
               <p className="font-semibold text-lg">{reattivo.name}</p>
-              <p className="text-xs text-muted-foreground font-mono">Lotto: {reattivo.lot_number}</p>
+              <p className="text-xs text-muted-foreground font-mono">
+                Lotto: {reattivo.lot_number}
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="bg-muted rounded-lg p-3">
               <p className="text-xs text-muted-foreground">Giacenza attuale</p>
-              <p className="text-2xl font-bold">{reattivo.quantity} <span className="text-sm font-normal">{reattivo.unit}</span></p>
+              <p className="text-2xl font-bold">
+                {reattivo.quantity}{" "}
+                <span className="text-sm font-normal">{reattivo.unit}</span>
+              </p>
             </div>
             <div className="bg-muted rounded-lg p-3">
               <p className="text-xs text-muted-foreground">Scadenza</p>
-              <p className="font-medium">{new Date(reattivo.expiration_date).toLocaleDateString("it-IT")}</p>
+              <p className="font-medium">
+                {new Date(reattivo.expiration_date).toLocaleDateString("it-IT")}
+              </p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -103,9 +132,16 @@ export default function ScannerizzaQRCode() {
               onClick={handleUsa}
               disabled={loading || reattivo.quantity <= 0}
             >
-              {loading ? "Aggiornamento..." : reattivo.quantity <= 0 ? "Giacenza esaurita" : "➖ Usa reattivo (-1)"}
+              {loading
+                ? "Aggiornamento..."
+                : reattivo.quantity <= 0
+                ? "Giacenza esaurita"
+                : "➖ Usa reattivo (-1)"}
             </Button>
-            <Button variant="outline" onClick={() => { setReattivo(null); setScanning(true); }}>
+            <Button
+              variant="outline"
+              onClick={() => { setReattivo(null); setErrore(null); setScanning(true); }}
+            >
               Scansiona altro
             </Button>
           </div>
